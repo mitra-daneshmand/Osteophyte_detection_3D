@@ -46,20 +46,13 @@ kvs.update('save_dir', save_dir)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 test_res = 0
 read_test_set = 0
-'''
+
 for fold in range(5):
     warnings.filterwarnings('ignore')
     with open((os.path.join(save_dir, f'session_fold_[{fold}].pkl')), 'rb') as f:
         session_snapshot = pickle.load(f)
     if read_test_set == 0:
         test_set = session_snapshot['test_set'][0]
-
-        ################### KL based evaluation ###################
-        inds = test_set[(test_set['KL'] > 1)].index  # no OA
-        # inds = test_set[(test_set['KL'] != 2)].index  # early OA
-        # inds = test_set[(test_set['KL'] < 3)].index  # severe OA
-        test_set.drop(inds, inplace=True)
-        test_set.reset_index(inplace=True, drop=True)
 
         mean = session_snapshot['mean'][0]
         std = session_snapshot['std'][0]
@@ -115,7 +108,6 @@ kvs.update('eval_type', 'test')
 np.savez_compressed(os.path.join(save_dir, 'results.npz'), y_true=y_true, y_pred=test_res)
 
 curves()
-'''
 
 result = np.load(os.path.join(save_dir, 'results.npz'))
 fold = 0
@@ -124,24 +116,9 @@ with open((os.path.join(save_dir, f'session_fold_[{fold}].pkl')), 'rb') as f:
     if read_test_set == 0:
         test_set = session_snapshot['test_set'][0]
 
-        ################### KL based evaluation ###################
-        # test_set.reset_index(inplace=True, drop=True)
-        # inds = test_set[(test_set['KL'] == 1) | (test_set['KL'] == 0)].index  # no OA
-        # inds = test_set[(test_set['KL'] == 2)].index  # early OA
-        # inds = test_set[(test_set['KL'] == 3) | (test_set['KL'] == 4)].index  # severe OA
-        # test_set.drop(inds, inplace=True)
-        # test_set = test_set.iloc[inds]
-
 
 y_true = result['y_true']#[inds]
 test_res = result['y_pred']#[inds]
-
-# kappas = cohen_kappa_score(y_true, test_res.round())
-# print('Cohen kappa is: ', kappas)
-#
-# mse = mean_squared_error(y_true, test_res)
-# print('MSE is: ', mse)
-
 
 
 df = pd.DataFrame(columns=['ID', 'SIDE', 'OSTs', 'preds', 'probs'])
@@ -150,16 +127,8 @@ df['SIDE'] = test_set['SIDE']
 df['OSTs'] = test_set[session_snapshot['args'][0].target_comp]
 df['probs'] = test_res
 
-# test_res = test_res.round()  # Binary
-# test_res = np.argmax(test_res, axis=1)
-# test_res = test_res.reshape(test_res.shape[0], 1)
-
 def to_labels(pos_probs, threshold):
     return (pos_probs >= threshold).astype('int')
-
-
-# precision, recall, thresholds = precision_recall_curve(y_true, test_res)
-# scores = (2 * precision * recall) / (precision + recall)
 
 fpr, tpr, thresholds = roc_curve(y_true, test_res)
 scores = tpr - fpr
@@ -180,21 +149,12 @@ print("Balanced accuracy: {:.2f}".format(balanced_acc))
 print("Confidence interval ({:.0%}): [{:.2f}, {:.2f}, {}]".format(confidence_level, conf_int[0], conf_int[1], (conf_int[1]-conf_int[0])/2))
 
 
-
-
-
 bal_acc = BalancedAccuracy()
 bal_acc.update(test_res, y_true)
 acc = bal_acc.compute()
 print('Balanced Accuracy is: ', acc)
 
 cm = pd.DataFrame(columns=[0, 1])
-
-# for i in range(4):
-#     indx = df[(df['OSTs'] == i) & (df['preds'] == int(i == 0))].index
-#     cm.loc[i, int(i != 0)] = len(indx)
-#     indx = df[(df['OSTs'] == i) & (df['preds'] != int(i == 0))].index
-#     cm.loc[i, int(i == 0)] = len(indx)
 
 indx = df[(df['OSTs'] == 0) & (df['preds'] == 0)].index
 cm.loc[0, 0] = len(indx)
