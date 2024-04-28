@@ -104,7 +104,6 @@ class Trainer(torchsample.modules.module_trainer.ModuleTrainer):
                 raise ValueError('num_inputs != num_val_inputs or num_targets != num_val_targets')
         has_val_data = val_loader is not None
         num_batches = int(math.ceil(len_inputs / batch_size))
-        # num_batches = 5
         # ----------------------------------------------------------------------
 
         fit_helper = _get_helper(self, num_inputs, num_targets)
@@ -150,33 +149,15 @@ class Trainer(torchsample.modules.module_trainer.ModuleTrainer):
 
                     input_batch, target_batch = fit_helper.grab_batch_from_loader(loader_iter)
 
-                    # input_batch=torch.from_numpy(np.array(input_batch)).float().to('cuda')
-                    # target_batch=torch.from_numpy(np.array(target_batch)).float().to('cuda')
                     if cuda_device >= 0:
                         input_batch, target_batch = fit_helper.move_to_cuda(cuda_device, input_batch, target_batch)
                         input_batch = input_batch.permute(0, 2, 1, 3, 4)  # ch3
-
-                    #############################################################################
-                    # input_batch, target_batch = self.generate_batches(input_batch, target_batch)
-
-
-                    # b = input_batch#.permute(0, 2, 3, 4, 1)  # 3 ch
-                    # a = b[0, 0, 50, :, :].cpu().numpy()
-                    # a2 = b[0, 1, 70, :, :].cpu().numpy()
-                    # a3 = b[0, 2, 70, :, :].cpu().numpy()
-                    # plt.imshow(a)
-                    # plt.show()
-                    # plt.imshow(a2)
-                    # plt.show()
-                    # plt.imshow(a3)
-                    # plt.show()
-
                     # ---------------------------------------------
                     if len(target_batch) == 1:
                         print('Singleton.')
                         continue
                     self._optimizer.zero_grad()
-                    output_batch = fit_forward_fn(input_batch.float())  #.float())
+                    output_batch = fit_forward_fn(input_batch.float())
                     # if len(target_batch) > 1:
                     #     loss = fit_loss_fn(output_batch, torch.squeeze(target_batch, 1).to(torch.int64))  # multi_class
                     #     batch_aps = train_aps(F.softmax(output_batch), torch.squeeze(target_batch, 1))  # multi_class
@@ -216,17 +197,6 @@ class Trainer(torchsample.modules.module_trainer.ModuleTrainer):
                     batch_logs['loss'] = loss.item()
                     callback_container.on_batch_end(batch_idx, batch_logs)
 
-                    # torch.cuda.empty_cache()
-                    # loss.detach()
-                    # input_batch.detach()
-                    # target_batch.detach()
-                    # output_batch.detach()
-                    # del loss
-                    # del input_batch
-                    # del target_batch
-                    # del output_batch
-
-                print(count)
                 if has_val_data:
                     val_epoch_logs, val_epoch_ap, val_epoch_roc_auc = self.evaluate_loader(val_loader,
                                                           cuda_device=cuda_device,
@@ -244,10 +214,6 @@ class Trainer(torchsample.modules.module_trainer.ModuleTrainer):
 
                     res = dict()
 
-                    # if type(val_epoch_ap) == list:
-                    #     res['ap_value'] = val_epoch_ap
-                    # else:
-                    #     res['ap_value'] = val_epoch_ap.data.tolist()
                     if type(val_epoch_ap) == list:
                         res['roc_auc_value'] = val_epoch_roc_auc
                     else:
@@ -329,11 +295,6 @@ class Trainer(torchsample.modules.module_trainer.ModuleTrainer):
             loss += eval_loss_fn(output_batch, target_batch).item()  # binary
             # loss += eval_loss_fn(output_batch, torch.squeeze(target_batch, 1).to(torch.int64)).item()  # multi_class
 
-
-            # input_batch.detach()
-            # output_batch.detach_()
-            # target_batch.detach_()
-
             # val_batch_aps = val_aps(F.softmax(output_batch), torch.squeeze(target_batch.int(), 1))  # multi_class
             val_batch_aps = val_aps(F.sigmoid(output_batch), target_batch)  # binary
             # val_batch_aps = val_aps(F.sigmoid(output_batch), torch.squeeze(target_batch, 2))  # multi_label
@@ -344,9 +305,6 @@ class Trainer(torchsample.modules.module_trainer.ModuleTrainer):
                 roc_auc += tmp
             except:
                 count += 1
-
-
-            # roc_auc += roc_auc_score(y_true=target_batch.detach().cpu().numpy(), y_score=output_batch.detach().cpu().numpy())
 
             all_output_batch.append(output_batch)
             all_target_batch.append(target_batch)
