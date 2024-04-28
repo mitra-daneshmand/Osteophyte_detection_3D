@@ -12,8 +12,6 @@ from args import parse_args
 
 from sklearn.metrics import roc_auc_score, average_precision_score, hamming_loss
 
-# This is my custom fork of torchsample which fixes some bugs.
-# Install via: pip install git+https://github.com/jrieke/torchsample
 import torchsample
 from torchsample.callbacks import EarlyStopping, ReduceLROnPlateau
 from torchsample.regularizers import L1Regularizer, L2Regularizer
@@ -32,33 +30,19 @@ def build_model(network, depth, learning_rate, weight_decay):
         else:
             net = generate_model(model_depth=depth, num_classes=args.n_classes)
 
-            # kvs = GlobalKVS()
-            # args = parse_args()
-            # fold = kvs['cur_fold']
-            # # save_dir = 'sessions/{}/{}/'.format(args.tissue, args.target_comp)
-            # save_dir = 'sessions/'
-            # saved_model = glob.glob(os.path.join(save_dir, 'fold_{}_epoch_'.format(fold) + '*'))[0]
-            #
-            # pretrain = torch.load(saved_model, map_location=torch.device('cpu'))
-            # net.load_state_dict(pretrain)
-            # parameters = get_fine_tuning_parameters(net, "complete")
-
     pytorch_total_params = sum(p.numel() for p in net.parameters() if p.requires_grad)
     print("Total number of trainable parameters: ", pytorch_total_params)
 
     if args.pretrain_path:
         print('loading pretrained model {}'.format(args.pretrain_path))
         pretrain = torch.load(args.pretrain_path, map_location=torch.device('cpu'))
-        # args.arch = '{}'.format(network)
-        # assert args.arch == pretrain['arch']
+
         d = pretrain['state_dict']
         for k, v in list(d.items()):
             pretrain['state_dict'][k.replace('module.', '')] = pretrain['state_dict'].pop(k)
 
         net_dict = net.state_dict()
         pretrain_dict = {k: v for k, v in pretrain['state_dict'].items() if k in net_dict.keys()}
-        # del pretrain_dict['fc.weight']  # 3ch
-        # del pretrain_dict['fc.bias']  # 3ch
 
         net_dict.update(pretrain_dict)
         net.load_state_dict(net_dict)
@@ -144,29 +128,6 @@ class CategoricalAccuracyWithLogits(torchsample.metrics.CategoricalAccuracy):
         a = (y_true.int().squeeze().detach().cpu())
         b = (F.softmax(y_pred).squeeze().detach().cpu())
         return super(CategoricalAccuracyWithLogits, self).__call__(b, a)
-
-
-class accuracy(torchmetrics.Metric):
-    def __init__(self):
-        super(accuracy, self).__init__()
-        self._name = 'acc'
-        self.add_state("correct", default=torch.tensor(0), dist_reduce_fx="sum")
-        self.add_state("total", default=torch.tensor(0), dist_reduce_fx="sum")
-
-    def update(self, y_pred, y_true) -> None:
-
-        if torch.cuda.is_available():
-            cuda_device = torch.cuda.current_device()
-            self.cuda(cuda_device)
-
-        a = np.array(y_true.int().squeeze().detach().cpu().numpy())
-        b = np.array(F.sigmoid(y_pred).squeeze().detach().cpu().numpy()).round()
-        # np.argmax(y_test, axis=1)
-
-        self.acc = accuracy_score(b, a)
-
-    def compute(self):
-        return self.acc
 
 
 class BalancedAccuracy(torchmetrics.Metric):
